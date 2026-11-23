@@ -12,7 +12,7 @@ let dspNodeParams = null;
 let jsonParams = null;
 
 // Change here to ("tuono") depending on your wasm file name
-const dspName = "bells";
+const dspName = "brass";
 const instance = new FaustWasm2ScriptProcessor(dspName);
 
 // output to window or npm package module
@@ -25,7 +25,7 @@ if (typeof module === "undefined") {
 }
 
 // The name should be the same as the WASM file, so change tuono with brass if you use brass.wasm
-bells.createDSP(audioContext, 1024)
+brass.createDSP(audioContext, 1024)
     .then(node => {
         dspNode = node;
         dspNode.connect(audioContext.destination);
@@ -55,11 +55,14 @@ function accelerationChange(accx, accy, accz) {
     // playAudio()
 }
 
+// Phone flat in the hand: the brass plays.
+// Tilt left/right (rotY) to change the pitch.
 function rotationChange(rotx, roty, rotz) {
+    playAudio(degrees(rotx), degrees(roty));
 }
 
 function mousePressed() {
-    // playAudio()
+    //playAudio()
     // Use this for debugging from the desktop!
 }
 
@@ -74,7 +77,7 @@ function deviceTurned() {
 function deviceShaken() {
     shaketimer = millis();
     statusLabels[0].style("color", "pink");
-    playAudio();
+    //playAudio();
 }
 
 function getMinMaxParam(address) {
@@ -95,15 +98,25 @@ function getMinMaxParam(address) {
 //
 //==========================================================================================
 
-function playAudio() {
+function playAudio(tiltX, tiltY) {
     if (!dspNode) {
         return;
     }
     if (audioContext.state === 'suspended') {
         return;
     }
-    dspNode.setParamValue("/englishBell/gate", 1)
-    setTimeout(() => { dspNode.setParamValue("/englishBell/gate", 0) }, 100);
+    // Volume: silent within 15° of flat on X (~0.26 rad on the page),
+    // then louder the more it's tilted forward/back
+    // (the brass goes silent below pressure 0.3, so start at 0.4)
+    const pressure = Math.abs(tiltX) < 15
+        ? 0
+        : constrain(map(Math.abs(tiltX), 15, 90, 0.4, 1), 0.4, 1);
+    // Pitch: tilt left = long tube (low), tilt right = short tube (high)
+    // (the brass only sounds with tubeLength ~0.2 - 0.5, silent outside)
+    const tube = constrain(map(tiltY, -60, 60, 0.5, 0.2), 0.2, 0.5);
+
+    dspNode.setParamValue("/brass/blower/pressure", pressure);   // 0 - 1
+    dspNode.setParamValue("/brass/brassModel/tubeLength", tube); // 0.01 - 2.5
 }
 
 //==========================================================================================
