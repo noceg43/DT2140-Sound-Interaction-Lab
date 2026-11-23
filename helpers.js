@@ -46,4 +46,10 @@ function setMotionListeners() {
 
 //==========================================================================================
 
+// iOS: by default Web Audio is muted by the ring/silent switch.
+// "playback" makes it behave like media audio so it plays even in silent mode.
+if (navigator.audioSession) {
+  navigator.audioSession.type = "playback";
+}
+
 const audioContext = new AudioContext();
