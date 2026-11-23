@@ -58,7 +58,7 @@ function accelerationChange(accx, accy, accz) {
 // Phone flat in the hand: the brass plays.
 // Tilt left/right (rotY) to change the pitch.
 function rotationChange(rotx, roty, rotz) {
-    playAudio(degrees(rotx), degrees(roty));
+    playAudio(rotx, roty);
 }
 
 function mousePressed() {
@@ -105,19 +105,33 @@ function playAudio(tiltX, tiltY) {
     if (audioContext.state === 'suspended') {
         return;
     }
-    // Volume: silent within 15° of flat on X (~0.26 rad on the page),
-    // then louder the more it's tilted forward/back
-    // (the brass goes silent below pressure 0.3, so start at 0.4)
-    const pressure = Math.abs(tiltX) < 15
+    // Silent zone: if BOTH |tiltX| and |tiltY| are within LIMIT (radians), pressure = 0
+    const LIMIT = 1.3;
+    const xInRange = Math.abs(tiltX) <= LIMIT;
+    const yInRange = Math.abs(tiltY) <= LIMIT;
+
+    const pressure = xInRange && yInRange
         ? 0
-        : constrain(map(Math.abs(tiltX), 15, 90, 0.4, 1), 0.4, 1);
-    // Pitch: tilt left = long tube (low), tilt right = short tube (high)
-    // (the brass only sounds with tubeLength ~0.2 - 0.5, silent outside)
-    const tube = constrain(map(tiltY, -60, 60, 0.5, 0.2), 0.2, 0.5);
+        : map(Math.abs(tiltX), LIMIT, 60, 0.4, 1, true);
+    const tube = map(tiltY, -60, 60, 0.5, 0.2, true);
 
     dspNode.setParamValue("/brass/blower/pressure", pressure);   // 0 - 1
     dspNode.setParamValue("/brass/brassModel/tubeLength", tube); // 0.01 - 2.5
+
+    // Hard mute: unplug the brass from the speakers when pressure is 0,
+    // so there is complete silence (no leftover tail)
+    if (pressure === 0 && connected) {
+        dspNode.disconnect();
+        connected = false;
+    } else if (pressure > 0 && !connected) {
+        dspNode.connect(audioContext.destination);
+        connected = true;
+    }
+
 }
+
+let connected = true;  // brass is connected to the speakers at startup
+let debugBox = null;   // DEBUG: on-page readout, remove when done
 
 //==========================================================================================
 // END
